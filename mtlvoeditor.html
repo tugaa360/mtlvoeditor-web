@@ -3,51 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音声入力対応 多言語対訳エディタ</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>多言語対訳エディタ</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        /* マイクボタンのスタイル */
-        #micButton {
-            background-color: #d1d5db; /* gray-300 */
-            padding: 0.3rem; /* 少し小さめ */
-            border-radius: 50%;
-            cursor: pointer;
-            transition: background-color 0.2s ease-in-out;
-            display: inline-flex; /* ボタンをインライン表示 */
-            align-items: center;
-            justify-content: center;
-            width: 32px; /* 固定幅 */
-            height: 32px; /* 固定高さ */
-            margin-left: 8px; /* タイトルとの間隔 */
-            border: none;
-        }
-        #micButton:hover {
-            background-color: #9ca3af; /* gray-400 */
-        }
-        #micButton.listening {
-            background-color: #ef4444; /* red-500 */
-        }
-        #micButton svg {
-            width: 18px;
-            height: 18px;
-            fill: #4b5563; /* gray-600 */
-        }
-        #micButton.listening svg {
-            fill: white;
-        }
-        /* 認識中のステータス（オプション）*/
-        #speechStatus {
-            font-size: 0.8rem;
-            color: #6b7280; /* gray-500 */
-            margin-left: 8px;
-            display: none; /* Initially hidden */
-        }
-        #speechStatus.active {
-            display: inline;
-        }
-
-        /* ローディングスピナー */
         .loader {
             border: 4px solid #f3f3f3; /* Light grey */
             border-top: 4px solid #3498db; /* Blue */
@@ -55,12 +13,25 @@
             width: 20px;
             height: 20px;
             animation: spin 2s linear infinite;
-            display: none; /* Initially hidden */
+            display: none;
+            vertical-align: middle;
             margin-left: 8px;
         }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+
+        .listening {
+            background-color: #4CAF50; /* Green when listening */
+            color: white;
+        }
+
+        #speechStatus.active {
+            margin-left: 10px;
+            font-size: 0.9em;
+            color: #d4ac0d; /* Yellow for status */
         }
 
         #feedbackArea {
@@ -70,78 +41,220 @@
             transform: translateX(-50%);
             background-color: rgba(0, 0, 0, 0.8);
             color: white;
-            padding: 1rem 2rem;
-            border-radius: 8px;
-            z-index: 1000;
+            padding: 10px 20px;
+            border-radius: 5px;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.3s ease-in-out, visibility 0s linear 0.3s;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+            z-index: 50;
         }
+
         #feedbackArea.show {
             opacity: 1;
             visibility: visible;
-            transition-delay: 0s;
+        }
+
+        .layout-btn.active {
+            background-color: #64b5f6;
+            color: white;
+        }
+
+        #speakTranslatedButton.speaking {
+            background-color: #f44336; /* Red when speaking */
+            color: white;
+        }
+
+        #dictionariesSection {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        #translationDictionaryTable, #readingDictionaryTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        #translationDictionaryTable th, #readingDictionaryTable th,
+        #translationDictionaryTable td, #readingDictionaryTable td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        #translationDictionaryTable th, #readingDictionaryTable th {
+            background-color: #f2f2f2;
+        }
+
+        #translationDictionaryTable input[type="text"], #readingDictionaryTable input[type="text"] {
+            width: 100%;
+            padding: 6px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .dictionary-controls button {
+            margin-right: 5px;
+        }
+
+        .apply-order-controls {
+            margin-bottom: 10px;
         }
     </style>
 </head>
-<body class="bg-gray-50 p-4">
-    <div class="container mx-auto p-6 bg-white rounded-lg shadow-md">
-        <header class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-800 flex items-center">
-                音声入力対応 多言語対訳エディタ
-                <button id="micButton" title="音声入力開始/停止">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><path d="M192 0C139 0 96 43 96 96V256c0 53 43 96 96 96s96-43 96-96V96c0-53-43-96-96-96zM64 216c0-13.3-10.7-24-24-24s-24 10.7-24 24v40c0 89.1 66.2 162.7 152 174.4V464H120c-13.3 0-24 10.7-24 24s10.7 24 24 24h144c13.3 0 24-10.7 24-24s-10.7-24-24-24H216V430.4c85.8-11.7 152-85.3 152-174.4V216c0-13.3-10.7-24-24-24s-24 10.7-24 24v40c0 70.7-57.3 128-128 128s-128-57.3-128-128V216z"/></svg>
+<body class="bg-gray-50">
+    <header class="bg-gray-100 py-4 shadow-md">
+        <div class="container mx-auto px-4">
+            <h1 class="text-2xl font-bold text-gray-800">多言語対訳エディタ</h1>
+            <p class="text-gray-600" id="description">テキストを入力して翻訳したり、音声で入力したりできます。</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto mt-8 px-4">
+        <div class="mb-4 flex items-center space-x-4">
+            <div>
+                <label for="sourceLangSelect" class="block text-gray-700 text-sm font-bold mb-2">入力言語:</label>
+                <select id="sourceLangSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </select>
+            </div>
+            <div>
+                <label for="targetLangSelect" class="block text-gray-700 text-sm font-bold mb-2">翻訳先言語:</label>
+                <select id="targetLangSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </select>
+            </div>
+            <div class="flex space-x-2">
+                <button id="micButton" title="音声入力" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7 8a4 4 0 118 0 4 4 0 01-8 0zm-2 4a5 5 0 002 3v2.5A1.5 1.5 0 008.5 16H11.5a1.5 1.5 0 001.5-1.5V12a5 5 0 002-3h-8z" clip-rule="evenodd" />
+                    </svg>
+                    <span id="speechStatus"></span>
                 </button>
-                <span id="speechStatus"></span>
-            </h1>
-            <p class="text-gray-600 mt-2" id="description">左側のテキストエリアに入力するか、マイクボタンを押して話すと、右側に翻訳が表示されます。</p>
-            <p class="text-red-600 text-sm mt-1"><strong>注意:</strong> 音声認識機能はChrome, Edge, Safari等の一部のブラウザでのみ動作します。マイクへのアクセス許可が必要です。</p>
-            <p class="text-red-600 text-sm mt-1"><strong>注意:</strong> このエディタは動作デモのために非公式の翻訳APIを使用しています。</p> </header>
-        <main class="mb-8">
-            <div id="controlsArea" class="flex flex-col sm:flex-row justify-center items-center mb-6 space-y-4 sm:space-y-0 sm:space-x-4">
-                <div id="layoutControls" class="flex justify-center space-x-2">
-                    <button data-layout="horizontal" class="layout-btn bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">左右</button>
-                    <button data-layout="vertical" class="layout-btn bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">上下</button>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <label for="sourceLangSelect" class="text-sm font-medium text-gray-700">入力:</label>
-                    <select id="sourceLangSelect" name="source_language" class="text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"></select>
-                    <label for="targetLangSelect" class="text-sm font-medium text-gray-700">出力:</label>
-                    <select id="targetLangSelect" name="target_language" class="text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"></select>
+                <button id="toggleDictionariesButton" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    辞書を開く
+                </button>
+            </div>
+        </div>
+
+        <section id="dictionariesSection">
+            <h2 class="text-xl font-semibold text-gray-800 mb-2">辞書編集</h2>
+
+            <div class="apply-order-controls">
+                <label class="block text-gray-700 text-sm font-bold mb-2">翻訳時の辞書適用:</label>
+                <select id="translationApplyOrder" class="shadow appearance-none border rounded w-auto py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="before">翻訳前</option>
+                    <option value="after" selected>翻訳後</option>
+                    <option value="none">適用しない</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="translationDictionaryTable" class="block text-gray-700 text-sm font-bold mb-2">翻訳辞書:</label>
+                <table id="translationDictionaryTable">
+                    <thead>
+                        <tr>
+                            <th>置換元</th>
+                            <th>置換先</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        </tbody>
+                </table>
+                <div class="dictionary-controls mb-2">
+                    <button id="addTranslationEntry" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">追加</button>
+                    <input type="file" id="importTranslationDictionary" class="hidden" accept=".csv">
+                    <button onclick="document.getElementById('importTranslationDictionary').click();" class="bg-blue-300 hover:bg-blue-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">インポート (CSV)</button>
+                    <button id="exportTranslationDictionary" class="bg-blue-300 hover:bg-blue-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">エクスポート (CSV)</button>
                 </div>
             </div>
 
-            <div id="textAreas" class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <section id="inputSection">
-                    <h2 class="text-xl font-semibold text-gray-700 mb-3 flex items-center" id="inputLanguageTitle">入力エリア</h2>
-                    <textarea id="inputText" class="w-full h-[300px] border border-gray-300 rounded-md p-4 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none bg-white shadow-sm" placeholder="ここにテキストを入力するか、マイクボタンを押して話してください" aria-label="入力テキストエリア"></textarea>
-                    <div class="flex justify-between mt-2">
-                        <button id="saveInputButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">保存</button>
-                        <button id="clearInputButton" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">クリア</button>
-                        <button id="copyInputButton" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">コピー</button>
-                    </div>
-                </section>
-                <section id="translatedSection">
-                    <h2 class="text-xl font-semibold text-gray-700 mb-3 flex items-center" id="translatedLanguageTitle">翻訳エリア <div class="loader" id="loadingSpinner"></div></h2>
-                    <textarea id="translatedText" class="w-full h-[300px] border border-gray-300 rounded-md p-4 text-gray-600 bg-gray-100 focus:outline-none shadow-sm" placeholder="翻訳結果がここに表示されます" readonly aria-live="polite" aria-label="翻訳結果エリア"></textarea>
-                    <div class="flex justify-between mt-2">
-                        <button id="saveTranslatedButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">保存</button>
-                        <button id="clearTranslatedButton" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">クリア</button>
-                        <button id="copyTranslatedButton" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">コピー</button>
-                    </div>
-                </section>
+            <div class="apply-order-controls">
+                <label class="block text-gray-700 text-sm font-bold mb-2">読み上げ時の辞書適用:</label>
+                <select id="readingApplyOrder" class="shadow appearance-none border rounded w-auto py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="before" selected>適用前</option>
+                    <option value="after">適用後</option>
+                    <option value="none">適用しない</option>
+                </select>
             </div>
-        </main>
-        <footer class="text-center text-gray-500 text-sm mt-4">
-            <p>翻訳の精度は、原文の内容や文脈、選択言語によって異なる場合があります。</p>
-            <p>音声認識機能は一部のブラウザでのみ利用可能です。</p>
-        </footer>
-    </div>
+
+            <div>
+                <label for="readingDictionaryTable" class="block text-gray-700 text-sm font-bold mb-2">読み上げ辞書:</label>
+                <table id="readingDictionaryTable">
+                    <thead>
+                        <tr>
+                            <th>原文</th>
+                            <th>読み</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        </tbody>
+                </table>
+                <div class="dictionary-controls mb-2">
+                    <button id="addReadingEntry" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">追加</button>
+                    <input type="file" id="importReadingDictionary" class="hidden" accept=".csv">
+                    <button onclick="document.getElementById('importReadingDictionary').click();" class="bg-blue-300 hover:bg-blue-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">インポート (CSV)</button>
+                    <button id="exportReadingDictionary" class="bg-blue-300 hover:bg-blue-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">エクスポート (CSV)</button>
+                </div>
+            </div>
+
+            <button id="saveDictionariesButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                辞書を保存
+            </button>
+        </section>
+
+        <div id="textAreas" class="grid grid-cols-2 gap-8 mb-6">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-800 mb-2" id="inputLanguageTitle">入力エリア (日本語)</h2>
+                <textarea id="inputText" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" rows="8"></textarea>
+                <div class="flex space-x-2 mt-2">
+                    <button id="saveInputButton" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">保存</button>
+                    <button id="clearInputButton" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">クリア</button>
+                    <button id="copyInputButton" class="bg-blue-300 hover:bg-blue-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">コピー</button>
+                </div>
+            </div>
+            <div>
+                <h2 class="text-lg font-semibold text-gray-800 mb-2" id="translatedLanguageTitle">翻訳エリア (英語) <div class="loader" id="loadingSpinner"></div></h2>
+                <textarea id="translatedText" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline resize-none" rows="8" readonly></textarea>
+                <div class="flex space-x-2 mt-2">
+                    <button id="saveTranslatedButton" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">保存</button>
+                    <button id="clearTranslatedButton" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">クリア</button>
+                    <button id="copyTranslatedButton" class="bg-blue-300 hover:bg-blue-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">コピー</button>
+                    <button id="speakTranslatedButton" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9.172 4.172a8 8 0 0111.314 11.314L15 15a8 8 0 11-11.314-11.314L5 5a8 8 0 0111.314 11.314l-3.686-3.686a4 4 0 00-5.656-5.656L9.172 4.172zM10 12a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                        </svg>
+                        読み上げ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">表示レイアウト</h2>
+            <div class="flex space-x-2">
+                <button data-layout="horizontal" class="layout-btn bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">左右</button>
+                <button data-layout="vertical" class="layout-btn bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">上下</button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-100 py-4 mt-8 shadow-md">
+        <div class="container mx-auto px-4 text-center text-gray-600 text-sm">
+            c 2025 多言語対訳エディタ
+        </div>
+    </footer>
+
     <div id="feedbackArea"></div>
 
     <script>
         (function() {
-            // --- DOM Elements ---
+            // --- DOM要素 ---
             const micButton = document.getElementById('micButton');
             const speechStatus = document.getElementById('speechStatus');
             const sourceLangSelect = document.getElementById('sourceLangSelect');
@@ -151,357 +264,1020 @@
             const loadingSpinner = document.getElementById('loadingSpinner');
             const feedbackArea = document.getElementById('feedbackArea');
             const layoutButtons = document.querySelectorAll('.layout-btn');
+            const speakTranslatedButton = document.getElementById('speakTranslatedButton');
+            const dictionariesSection = document.getElementById('dictionariesSection');
+            const toggleDictionariesButton = document.getElementById('toggleDictionariesButton');
+            const translationDictionaryTableBody = document.getElementById('translationDictionaryTable').getElementsByTagName('tbody')[0];
+            const readingDictionaryTableBody = document.getElementById('readingDictionaryTable').getElementsByTagName('tbody')[0];
+            const addTranslationEntryButton = document.getElementById('addTranslationEntry');
+            const addReadingEntryButton = document.getElementById('addReadingEntry');
+            const importTranslationDictionaryButton = document.getElementById('importTranslationDictionary');
+            const exportTranslationDictionaryButton = document.getElementById('exportTranslationDictionary');
+            const importReadingDictionaryButton = document.getElementById('importReadingDictionary');
+            const exportReadingDictionaryButton = document.getElementById('exportReadingDictionary');
+            const saveDictionariesButton = document.getElementById('saveDictionariesButton');
+            const translationApplyOrderSelect = document.getElementById('translationApplyOrder');
+            const readingApplyOrderSelect = document.getElementById('readingApplyOrder');
 
-            // --- Configuration & State ---
+            // --- 定数 ---
             const DEBOUNCE_DELAY = 500;
             const FEEDBACK_DURATION = 2500;
-            const freeGoogleTranslateUrl = 'https://translate.googleapis.com/translate_a/single';
+            const FREE_GOOGLE_TRANSLATE_URL = 'https://translate.googleapis.com/translate_a/single';
             const LANGUAGES = {
                 'ja': '日本語', 'en': '英語', 'zh-CN': '中国語 (簡体)', 'ko': '韓国語',
                 'de': 'ドイツ語', 'fr': 'フランス語', 'es': 'スペイン語', 'it': 'イタリア語', 'ru': 'ロシア語'
             };
-            let sourceLang = 'ja';
-            let targetLang = 'en';
-            let currentLayout = 'horizontal';
+            const LOCAL_STORAGE_KEY_TRANSLATION_DICTIONARY = 'translationDictionary';
+            const LOCAL_STORAGE_KEY_READING_DICTIONARY = 'readingDictionary';
+            const LOCAL_STORAGE_KEY_TRANSLATION_APPLY_ORDER = 'translationApplyOrder';
+            const LOCAL_STORAGE_KEY_READING_APPLY_ORDER = 'readingApplyOrder';
+
+            // --- 状態変数 ---
+            let sourceLang = localStorage.getItem('sourceLang') || 'ja';
+            let targetLang = localStorage.getItem('targetLang') || 'en';
+            let currentLayout = localStorage.getItem('layout') || 'horizontal';
             let debounceTimer;
             let feedbackTimer;
             let isTranslating = false;
             let isRecognizing = false;
+            let isSpeaking = false;
+            let currentUtterance = null;
+            let translationDictionary = loadDictionary(LOCAL_STORAGE_KEY_TRANSLATION_DICTIONARY);
+            let readingDictionary = loadDictionary(LOCAL_STORAGE_KEY_READING_DICTIONARY); // *** 修正点 1 ***
+            let isDictionariesVisible = false;
+            let translationApplyOrder = localStorage.getItem(LOCAL_STORAGE_KEY_TRANSLATION_APPLY_ORDER) || 'after';
+            let readingApplyOrder = localStorage.getItem(LOCAL_STORAGE_KEY_READING_APPLY_ORDER) || 'before';
 
-            // --- Web Speech API ---
+            /**
+             * ローカルストレージから辞書を読み込む
+             * @param {string} key ローカルストレージのキー
+             * @returns {object} 辞書オブジェクト
+             */
+            function loadDictionary(key) {
+                const stored = localStorage.getItem(key);
+                try {
+                    return stored ? JSON.parse(stored) : {};
+                } catch (e) {
+                    console.error(`Failed to parse dictionary from localStorage (key: ${key}):`, e);
+                    return {}; // パース失敗時は空のオブジェクトを返す
+                }
+            }
+
+            /**
+             * ローカルストレージに辞書を保存する
+             * @param {string} key ローカルストレージのキー
+             * @param {object} dictionary 辞書オブジェクト
+             */
+            function saveDictionary(key, dictionary) {
+                try {
+                    localStorage.setItem(key, JSON.stringify(dictionary));
+                    showFeedback(`辞書 (${key === LOCAL_STORAGE_KEY_TRANSLATION_DICTIONARY ? '翻訳' : '読み上げ'}) を保存しました。`);
+                } catch (e) {
+                    console.error(`Failed to save dictionary to localStorage (key: ${key}):`, e);
+                    showFeedback(`辞書 (${key === LOCAL_STORAGE_KEY_TRANSLATION_DICTIONARY ? '翻訳' : '読み上げ'}) の保存に失敗しました。`, true);
+                }
+            }
+
+            /**
+             * テキストに辞書を適用する
+             * @param {string} text 元のテキスト
+             * @param {object} dictionary 辞書オブジェクト
+             * @returns {string} 辞書が適用されたテキスト
+             */
+            function applyDictionary(text, dictionary) {
+                let replacedText = text;
+                for (const key in dictionary) {
+                    // キーを正規表現用にエスケープ
+                    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    // 大文字小文字を区別しない、グローバル置換
+                    const regex = new RegExp(escapedKey, 'gi');
+                    // 置換後の文字列中の '$' は特別な意味を持つためエスケープ
+                    const escapedValue = dictionary[key].replace(/\$/g, '$$$$');
+                    replacedText = replacedText.replace(regex, escapedValue);
+                }
+                return replacedText;
+            }
+
+            /**
+             * 辞書UIを更新する
+             */
+            function updateDictionaryUI() {
+                clearTable(translationDictionaryTableBody);
+                for (const key in translationDictionary) {
+                    addDictionaryRow(translationDictionaryTableBody, key, translationDictionary[key], 'translation');
+                }
+
+                clearTable(readingDictionaryTableBody);
+                for (const key in readingDictionary) {
+                    addDictionaryRow(readingDictionaryTableBody, key, readingDictionary[key], 'reading');
+                }
+            }
+
+            /**
+             * テーブルのすべての子要素を削除する
+             * @param {HTMLTableSectionElement} table テーブルのtbody要素
+             */
+            function clearTable(table) {
+                while (table.firstChild) {
+                    table.removeChild(table.firstChild);
+                }
+            }
+
+            /**
+             * 辞書テーブルに行を追加する
+             * @param {HTMLTableSectionElement} table テーブルのtbody要素
+             * @param {string} key キー
+             * @param {string} value 値
+             * @param {string} type 辞書の種類 ('translation' または 'reading')
+             */
+            function addDictionaryRow(table, key, value, type) {
+                const row = table.insertRow();
+
+                const keyCell = row.insertCell();
+                const keyInput = document.createElement('input');
+                keyInput.type = 'text';
+                keyInput.value = key;
+                keyInput.classList.add('shadow', 'appearance-none', 'border', 'rounded', 'w-full', 'py-2', 'px-3', 'text-gray-700', 'leading-tight', 'focus:outline-none', 'focus:shadow-outline');
+                keyCell.appendChild(keyInput);
+
+                const valueCell = row.insertCell();
+                const valueInput = document.createElement('input');
+                valueInput.type = 'text';
+                valueInput.value = value;
+                valueInput.classList.add('shadow', 'appearance-none', 'border', 'rounded', 'w-full', 'py-2', 'px-3', 'text-gray-700', 'leading-tight', 'focus:outline-none', 'focus:shadow-outline');
+                valueCell.appendChild(valueInput);
+
+                const deleteCell = row.insertCell();
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = '削除';
+                deleteButton.classList.add('bg-red-500', 'hover:bg-red-700', 'text-white', 'font-bold', 'py-1', 'px-2', 'rounded', 'focus:outline-none', 'focus:shadow-outline', 'text-sm');
+                deleteButton.addEventListener('click', () => {
+                    // inputから現在のキーを取得して削除する（編集中でも対応できるように）
+                    const currentKey = keyInput.value.trim();
+                    if (currentKey) { // 空のキーは削除しない
+                         if (type === 'translation') {
+                             translationDictionary = extractDictionaryFromTable(translationDictionaryTableBody); // 現在のテーブル状態を取得
+                             delete translationDictionary[currentKey];
+                         } else {
+                             readingDictionary = extractDictionaryFromTable(readingDictionaryTableBody); // 現在のテーブル状態を取得
+                             delete readingDictionary[currentKey];
+                         }
+                         updateDictionaryUI(); // UIを再描画
+                    } else {
+                         row.remove(); // キーが空なら行ごと削除
+                    }
+                });
+                deleteCell.appendChild(deleteButton);
+            }
+
+
+            /**
+             * テーブルから辞書オブジェクトを抽出する
+             * @param {HTMLTableSectionElement} table テーブルのtbody要素
+             * @returns {object} 辞書オブジェクト
+             */
+            function extractDictionaryFromTable(table) {
+                const dictionary = {};
+                const rows = table.rows;
+                for (let i = 0; i < rows.length; i++) {
+                    const keyInput = rows[i].cells[0].querySelector('input');
+                    const valueInput = rows[i].cells[1].querySelector('input');
+                    // キーと値の両方が存在し、キーが空でない場合のみ追加
+                    if (keyInput && valueInput && keyInput.value.trim() !== '') {
+                        dictionary[keyInput.value.trim()] = valueInput.value.trim();
+                    }
+                }
+                return dictionary;
+            }
+
+            /**
+             * CSVファイルから辞書をインポートする
+             * @param {File} file CSVファイル
+             * @param {string} type 辞書の種類 ('translation' または 'reading')
+             */
+             function importDictionaryFromCSV(file, type) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const csv = event.target.result;
+                    const lines = csv.split(/\r?\n/); // 改行コードに対応
+                    const newDictionary = {};
+                    let errorCount = 0;
+
+                    lines.forEach((line, index) => {
+                        const trimmedLine = line.trim();
+                        if (!trimmedLine) return; // 空行は無視
+
+                        // カンマで分割するが、ダブルクォートで囲まれたフィールド内のカンマは無視する簡易的な対応
+                        // (より複雑なCSVには対応できない可能性あり)
+                        const parts = [];
+                        let currentPart = '';
+                        let inQuotes = false;
+                        for (let i = 0; i < trimmedLine.length; i++) {
+                            const char = trimmedLine[i];
+                            if (char === '"' && (i === 0 || trimmedLine[i-1] !== '"')) { // ダブルクォートの開始/終了 (エスケープされた "" は無視)
+                                inQuotes = !inQuotes;
+                            } else if (char === ',' && !inQuotes) {
+                                parts.push(currentPart.trim().replace(/^"|"$/g, '').replace(/""/g, '"')); // 前後の引用符を削除し、エスケープされた引用符を元に戻す
+                                currentPart = '';
+                            } else {
+                                currentPart += char;
+                            }
+                        }
+                        parts.push(currentPart.trim().replace(/^"|"$/g, '').replace(/""/g, '"')); // 最後の部分を追加
+
+                        if (parts.length === 2) {
+                            const key = parts[0];
+                            const value = parts[1];
+                            if (key) { // キーが空でないことを確認
+                                newDictionary[key] = value;
+                            } else {
+                                console.warn(`CSVインポート: ${index + 1}行目のキーが空です。スキップします。 Line: ${line}`);
+                                errorCount++;
+                            }
+                        } else {
+                            console.warn(`CSVインポート: ${index + 1}行目のフォーマットが不正です（期待される列数: 2）。スキップします。 Line: ${line}`);
+                            errorCount++;
+                        }
+                    });
+
+                    if (Object.keys(newDictionary).length > 0) {
+                        if (type === 'translation') {
+                            translationDictionary = newDictionary;
+                        } else {
+                            readingDictionary = newDictionary;
+                        }
+                        updateDictionaryUI();
+                        showFeedback(`辞書 (${type === 'translation' ? '翻訳' : '読み上げ'}) をインポートしました。${errorCount > 0 ? ` (${errorCount}件のエラー)` : ''}`);
+                    } else {
+                        showFeedback('CSVファイルから有効な辞書データを読み込めませんでした。', true);
+                    }
+                };
+                reader.onerror = () => {
+                    showFeedback('CSVファイルの読み込みに失敗しました。', true);
+                };
+                reader.readAsText(file);
+            }
+
+            /**
+             * 辞書をCSVファイルとしてエクスポートする
+             * @param {object} dictionary 辞書オブジェクト
+             * @param {string} filename ファイル名
+             */
+            function exportDictionaryToCSV(dictionary, filename) { // *** 修正点 2 ***
+                // Helper function to escape CSV field
+                const escapeCsvField = (field) => {
+                    // Ensure field is a string
+                    const stringField = String(field);
+                    // If the field contains a comma, newline, or double quote, enclose in double quotes
+                    if (stringField.includes(',') || stringField.includes('\n') || stringField.includes('"')) {
+                        // Escape existing double quotes by replacing them with two double quotes
+                        const escapedField = stringField.replace(/"/g, '""');
+                        return `"${escapedField}"`;
+                    }
+                    return stringField;
+                };
+
+                let csvRows = [];
+                // Add header row (optional, but good practice)
+                // csvRows.push("Key,Value"); // 必要ならヘッダーを追加
+
+                for (const key in dictionary) {
+                    const escapedKey = escapeCsvField(key);
+                    const escapedValue = escapeCsvField(dictionary[key]);
+                    csvRows.push(`${escapedKey},${escapedValue}`);
+                }
+
+                const csvContent = csvRows.join("\n");
+                // BOMを追加してExcelでの文字化けを防ぐ
+                const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                document.body.appendChild(link); // Firefoxでの動作に必要な場合がある
+                link.click();
+                document.body.removeChild(link); // クリック後に要素を削除
+                URL.revokeObjectURL(url); // メモリリークを防ぐ
+                showFeedback(`辞書 (${filename.includes('translation') ? '翻訳' : '読み上げ'}) をエクスポートしました。`);
+            }
+
+
+            // --- イベントリスナー ---
+            toggleDictionariesButton.addEventListener('click', () => {
+                isDictionariesVisible = !isDictionariesVisible;
+                dictionariesSection.style.display = isDictionariesVisible ? 'block' : 'none';
+                toggleDictionariesButton.textContent = isDictionariesVisible ? '辞書を閉じる' : '辞書を開く';
+                 if (isDictionariesVisible) {
+                    // 開いた時に最新の辞書データをUIに反映
+                    updateDictionaryUI();
+                 }
+            });
+
+            addTranslationEntryButton.addEventListener('click', () => {
+                addDictionaryRow(translationDictionaryTableBody, '', '', 'translation');
+            });
+
+            addReadingEntryButton.addEventListener('click', () => {
+                addDictionaryRow(readingDictionaryTableBody, '', '', 'reading');
+            });
+
+            importTranslationDictionaryButton.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    importDictionaryFromCSV(file, 'translation');
+                }
+                event.target.value = ''; // ファイル選択をリセットして同じファイルを再選択可能にする
+            });
+
+            exportTranslationDictionaryButton.addEventListener('click', () => {
+                // エクスポート前にテーブルから最新の辞書データを取得
+                const currentTranslationDict = extractDictionaryFromTable(translationDictionaryTableBody);
+                exportDictionaryToCSV(currentTranslationDict, 'translation_dictionary.csv');
+            });
+
+            importReadingDictionaryButton.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    importDictionaryFromCSV(file, 'reading');
+                }
+                event.target.value = ''; // ファイル選択をリセット
+            });
+
+            exportReadingDictionaryButton.addEventListener('click', () => {
+                // エクスポート前にテーブルから最新の辞書データを取得
+                const currentReadingDict = extractDictionaryFromTable(readingDictionaryTableBody);
+                exportDictionaryToCSV(currentReadingDict, 'reading_dictionary.csv');
+            });
+
+            saveDictionariesButton.addEventListener('click', () => {
+                translationDictionary = extractDictionaryFromTable(translationDictionaryTableBody);
+                readingDictionary = extractDictionaryFromTable(readingDictionaryTableBody);
+                saveDictionary(LOCAL_STORAGE_KEY_TRANSLATION_DICTIONARY, translationDictionary);
+                saveDictionary(LOCAL_STORAGE_KEY_READING_DICTIONARY, readingDictionary);
+            });
+
+            translationApplyOrderSelect.addEventListener('change', (event) => {
+                translationApplyOrder = event.target.value;
+                localStorage.setItem(LOCAL_STORAGE_KEY_TRANSLATION_APPLY_ORDER, translationApplyOrder);
+                translateText(inputTextarea.value); // 適用順序変更時に再翻訳
+            });
+
+            readingApplyOrderSelect.addEventListener('change', (event) => {
+                readingApplyOrder = event.target.value;
+                localStorage.setItem(LOCAL_STORAGE_KEY_READING_APPLY_ORDER, readingApplyOrder);
+            });
+
+            // --- Web Speech API (Speech Synthesis) ---
+            const synth = window.speechSynthesis;
+            let voices = [];
+
+            function populateVoices() {
+                voices = synth.getVoices();
+                // console.log("Available voices:", voices); // デバッグ用に利用可能な音声を表示
+            }
+
+            // ブラウザによっては onvoiceschanged が発火しない場合があるため、
+            // 少し遅延させて getVoices を呼び出すフォールバックを追加
+            populateVoices();
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = populateVoices;
+            }
+
+            function speak(text, langCode) {
+                if (isSpeaking || synth.speaking) { // 二重実行や再生中のキャンセルを防止
+                    console.log("Speech synthesis stopped.");
+                    synth.cancel(); // 現在の発話をキャンセル
+                    speakTranslatedButton.classList.remove('speaking');
+                    isSpeaking = false;
+                    if (currentUtterance) {
+                        currentUtterance.onend = null; // イベントリスナーをクリア
+                        currentUtterance.onerror = null;
+                        currentUtterance = null;
+                    }
+                    return;
+                }
+
+                let processedText = text;
+                if (readingApplyOrder === 'before') {
+                    processedText = applyDictionary(processedText, readingDictionary);
+                    // console.log("Text to speak (before dictionary):", text);
+                    // console.log("Text to speak (after dictionary):", processedText);
+                } else {
+                     // console.log("Text to speak (dictionary not applied before):", processedText);
+                }
+
+
+                if (processedText && processedText.trim()) {
+                    const utterance = new SpeechSynthesisUtterance(processedText);
+                    currentUtterance = utterance; // 現在の発話オブジェクトを保持
+
+                    // 言語コードに完全一致または前方一致するボイスを探す
+                    let selectedVoice = voices.find(voice => voice.lang === langCode);
+                    if (!selectedVoice) {
+                         selectedVoice = voices.find(voice => voice.lang.startsWith(langCode.split('-')[0]));
+                    }
+                     // 特殊ケース: 中国語
+                    if (!selectedVoice && langCode.startsWith('zh')) {
+                        selectedVoice = voices.find(voice => voice.lang.startsWith('zh-CN') || voice.lang.startsWith('zh-TW') || voice.lang.startsWith('zh-HK'));
+                    }
+
+                    if (selectedVoice) {
+                        utterance.voice = selectedVoice;
+                        // console.log(`Using voice: ${selectedVoice.name} (${selectedVoice.lang})`);
+                    } else {
+                        console.warn(`No voice found for language: ${langCode}. Using default.`);
+                    }
+
+                    utterance.lang = langCode; // lang プロパティも設定
+                    utterance.rate = 0.9; // 再生速度を少し遅く
+                    // utterance.pitch = 1;
+                    // utterance.volume = 1;
+
+                    utterance.onstart = () => {
+                        // console.log('Speech synthesis started.');
+                        isSpeaking = true;
+                        speakTranslatedButton.classList.add('speaking');
+                        speakTranslatedButton.title = "読み上げ停止";
+                    };
+
+                    utterance.onend = () => {
+                        // console.log('Speech synthesis finished.');
+                        isSpeaking = false;
+                        speakTranslatedButton.classList.remove('speaking');
+                        speakTranslatedButton.title = "読み上げ";
+                        currentUtterance = null; // 終了したらクリア
+                    };
+
+                    utterance.onerror = (event) => {
+                        console.error('Speech synthesis error:', event.error);
+                        showFeedback(`読み上げエラー: ${event.error}`, true);
+                        isSpeaking = false;
+                        speakTranslatedButton.classList.remove('speaking');
+                        speakTranslatedButton.title = "読み上げ";
+                        currentUtterance = null; // エラー時もクリア
+                    };
+
+                    synth.speak(utterance);
+
+                    // 'after' の処理は現在コメントアウトされています
+                    // if (readingApplyOrder === 'after') {
+                    //     // 読み上げ後に元のテキストを復元する必要がある場合はここに追加
+                    // }
+                } else {
+                    showFeedback('読み上げるテキストがありません。');
+                }
+            }
+
+
+            speakTranslatedButton.addEventListener('click', () => {
+                const textToSpeak = translatedTextarea.value;
+                speak(textToSpeak, targetLang);
+            });
+
+
+            // --- Web Speech API (Speech Recognition) ---
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             let recognition = null;
 
             if (SpeechRecognition) {
-                recognition = new SpeechRecognition();
-                recognition.interimResults = true;
-                recognition.continuous = false;
+                try {
+                    recognition = new SpeechRecognition();
+                    recognition.interimResults = true; // 途中結果を取得する
+                    recognition.continuous = true; // 継続的に認識する (falseだと一文で終了)
+                    recognition.lang = sourceLang; // 初期言語設定
 
-                recognition.onstart = () => {
-                    isRecognizing = true;
-                    micButton.classList.add('listening');
-                    speechStatus.textContent = '認識中...';
-                    speechStatus.classList.add('active');
-                    console.log('Speech recognition started.');
-                };
+                    let finalTranscript = ''; // 最終結果を保持する変数
 
-                recognition.onresult = (event) => {
-                    let interimTranscript = '';
-                    let finalTranscript = '';
+                    recognition.onstart = () => {
+                        isRecognizing = true;
+                        micButton.classList.add('listening');
+                        micButton.title = "音声認識停止";
+                        speechStatus.textContent = '認識中...';
+                        speechStatus.classList.add('active');
+                        finalTranscript = ''; // 開始時にリセット
+                        console.log('Speech recognition started.');
+                    };
 
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            finalTranscript += event.results[i][0].transcript;
-                        } else {
-                            interimTranscript += event.results[i][0].transcript;
+                    recognition.onresult = (event) => {
+                        let interimTranscript = '';
+                        // console.log("Speech result event:", event); // デバッグ用
+                        for (let i = event.resultIndex; i < event.results.length; ++i) {
+                            if (event.results[i].isFinal) {
+                                finalTranscript += event.results[i][0].transcript;
+                            } else {
+                                interimTranscript += event.results[i][0].transcript;
+                            }
                         }
-                    }
 
-                    // 認識中の途中結果をテキストエリアに反映
-                    inputTextarea.value = interimTranscript;
+                        // 途中結果を表示 (上書き)
+                         speechStatus.textContent = interimTranscript || '...'; // 何か認識中であることを示す
 
-                    // 最終結果が得られたら、既存のテキストに追加して翻訳をトリガー
-                    if (finalTranscript) {
-                        const currentText = inputTextarea.value;
-                        inputTextarea.value = currentText + finalTranscript;
-                        localStorage.setItem('inputText', inputTextarea.value);
-                        translateText(inputTextarea.value);
-                    }
-                };
+                        // 最終結果が得られたらテキストエリアに追加
+                        if (finalTranscript) {
+                            const currentText = inputTextarea.value;
+                            // 文脈を考慮してスペースを追加するかどうか判断 (単純な例)
+                            const separator = currentText.endsWith(' ') || currentText === '' ? '' : ' ';
+                            inputTextarea.value = currentText + separator + finalTranscript;
+                            localStorage.setItem('inputText', inputTextarea.value);
+                            translateText(inputTextarea.value); // 翻訳をトリガー
+                            finalTranscript = ''; // 次の最終結果のためにリセット
+                        }
+                    };
 
-                recognition.onerror = (event) => {
-                    console.error('Speech recognition error:', event.error);
-                    let errorMessage = '音声認識エラーが発生しました。';
-                    if (event.error === 'no-speech') {
-                        errorMessage = '音声が検出されませんでした。';
-                    } else if (event.error === 'audio-capture') {
-                        errorMessage = 'マイクにアクセスできませんでした。';
-                    } else if (event.error === 'not-allowed') {
-                        errorMessage = 'マイクの使用が許可されていません。';
-                    } else if (event.error === 'network') {
-                        errorMessage = 'ネットワークエラーが発生しました。';
-                    } else if (event.error === 'service-not-allowed'){
-                        errorMessage = 'ブラウザまたはOSにより音声認識サービスが許可されていません。';
-                    }
-                    showFeedback(errorMessage, true);
-                    if (isRecognizing) {
-                        recognition.stop();
-                    }
-                };
 
-                recognition.onend = () => {
-                    isRecognizing = false;
-                    micButton.classList.remove('listening');
-                    speechStatus.classList.remove('active');
-                    speechStatus.textContent = '';
-                    console.log('Speech recognition ended.');
-                };
+                    recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        let errorMessage = '音声認識エラー';
+                        switch (event.error) {
+                            case 'no-speech':
+                                errorMessage = '音声未検出';
+                                break;
+                            case 'audio-capture':
+                                errorMessage = 'マイク取得不可';
+                                break;
+                            case 'not-allowed':
+                                errorMessage = 'マイク不許可';
+                                break;
+                            case 'network':
+                                errorMessage = 'ネットワークエラー';
+                                break;
+                            case 'service-not-allowed':
+                                errorMessage = 'サービス不許可';
+                                break;
+                            case 'aborted':
+                                errorMessage = '中断'; // ユーザーが停止した場合など
+                                break;
+                            default:
+                                errorMessage = `エラー (${event.error})`;
+                        }
+                         // 'aborted' はユーザー操作による停止の可能性があるので、フィードバックは短めに
+                        if (event.error !== 'aborted') {
+                            showFeedback(errorMessage, true);
+                        }
+                        speechStatus.textContent = errorMessage;
+                        speechStatus.classList.add('active');
+                        // エラー内容によっては自動で onend が呼ばれない場合があるので、
+                        // 状態をリセットする処理をここにも入れる
+                        stopRecognitionInternal(); // 状態リセットとUI更新
+                        setTimeout(() => {
+                            if (!isRecognizing) { // 認識が再開されていなければクリア
+                                speechStatus.textContent = '';
+                                speechStatus.classList.remove('active');
+                            }
+                        }, FEEDBACK_DURATION);
+                    };
+
+                    recognition.onend = () => {
+                        // console.log('Speech recognition ended.');
+                        // stopRecognitionInternal() は stop() からも呼ばれるため、
+                        // ここでは主に予期せぬ終了（タイムアウトなど）の場合の処理を行う
+                        if (isRecognizing) { // stop() 以外で終了した場合
+                           stopRecognitionInternal(); // 状態とUIをリセット
+                           speechStatus.textContent = '認識終了';
+                           speechStatus.classList.add('active');
+                           setTimeout(() => {
+                               speechStatus.textContent = '';
+                               speechStatus.classList.remove('active');
+                           }, FEEDBACK_DURATION / 2); // 少し短めに表示
+                        }
+                    };
+                } catch (e) {
+                    console.error("Failed to initialize SpeechRecognition:", e);
+                    micButton.disabled = true;
+                    micButton.title = '音声入力の初期化に失敗しました。';
+                    document.getElementById('description').textContent += ' (音声入力初期化エラー)';
+                }
 
             } else {
-                console.warn('Web Speech API is not supported in this browser.');
-                if(micButton) {
-                    micButton.disabled = true;
-                    micButton.title = 'お使いのブラウザは音声認識に対応していません。';
-                    micButton.style.cursor = 'not-allowed';
-                    micButton.style.opacity = '0.5';
+                console.log('Speech Recognition API is not supported in this browser.');
+                micButton.disabled = true;
+                micButton.title = '音声入力はご利用のブラウザではサポートされていません。';
+                document.getElementById('description').textContent += ' (音声入力非対応ブラウザ)';
+            }
+
+            function startRecognition() {
+                if (recognition && !isRecognizing) {
+                    try {
+                        recognition.lang = sourceLang; // 開始前に言語を設定
+                        recognition.start();
+                    } catch (e) {
+                        console.error("Error starting recognition:", e);
+                        showFeedback("音声認識の開始に失敗しました。", true);
+                        stopRecognitionInternal(); // 念のため状態をリセット
+                    }
                 }
             }
 
-            // --- Helper Functions ---
-            function getLangName(code) {
-                return LANGUAGES[code] || code;
+             // 状態とUIをリセットする内部関数
+            function stopRecognitionInternal() {
+                isRecognizing = false;
+                micButton.classList.remove('listening');
+                micButton.title = "音声入力";
+                // speechStatus は onend や onerror で適切に設定されるので、ここではクリアしない
+                // console.log("Recognition state reset.");
             }
 
-            function showFeedback(message, isError = false) {
-                feedbackArea.textContent = message;
-                feedbackArea.classList.add('show');
-                clearTimeout(feedbackTimer);
-                feedbackTimer = setTimeout(() => {
-                    feedbackArea.classList.remove('show');
-                }, FEEDBACK_DURATION);
+
+            function stopRecognition() {
+                if (recognition && isRecognizing) {
+                    recognition.stop();
+                    // onend が呼ばれるのを待って stopRecognitionInternal を実行
+                    // console.log("Speech recognition stop requested.");
+                }
+                 // 即座にUIを更新する場合
+                 stopRecognitionInternal();
+                 speechStatus.textContent = ''; // 停止操作時はステータスをクリア
+                 speechStatus.classList.remove('active');
             }
 
-            function updateUIForLanguage() {
-                document.getElementById('inputLanguageTitle').textContent = `入力エリア (${getLangName(sourceLang)})`;
-                document.getElementById('translatedLanguageTitle').textContent = `翻訳エリア (${getLangName(targetLang)})`;
-                document.getElementById('description').textContent = `左側のテキストエリアに入力するか、マイクボタンを押して話すと、右側に${getLangName(targetLang)}の翻訳が表示されます。`;
-            }
+            micButton.addEventListener('click', () => {
+                if (!recognition) return; // recognition が初期化されていない場合は何もしない
 
-            function updateDescription() {
-                document.getElementById('description').textContent = `左側のテキストエリアに入力するか、マイクボタンを押して話すと、右側に${getLangName(targetLang)}の翻訳が表示されます。`;
-            }
-
-            function setLayout(layout) {
-                currentLayout = layout;
-                const textAreas = document.getElementById('textAreas');
-if (layout === 'vertical') {
-                    textAreas.classList.remove('md:grid-cols-2');
-                    textAreas.classList.add('grid-cols-1');
+                if (!isRecognizing) {
+                    startRecognition();
                 } else {
-                    textAreas.classList.remove('grid-cols-1');
-                    textAreas.classList.add('md:grid-cols-2');
+                    stopRecognition();
                 }
-                localStorage.setItem('translationEditorLayout', layout);
-                layoutButtons.forEach(btn => {
-                    btn.classList.remove('bg-blue-500', 'text-white');
-                    btn.classList.add('bg-gray-300', 'text-gray-800');
-                    if (btn.dataset.layout === layout) {
-                        btn.classList.add('bg-blue-500', 'text-white');
-                    }
-                });
-            }
-
-            function populateDropdowns() {
-                for (const code in LANGUAGES) {
-                    const sourceOption = document.createElement('option');
-                    sourceOption.value = code;
-                    sourceOption.textContent = LANGUAGES[code];
-                    sourceLangSelect.appendChild(sourceOption);
-
-                    const targetOption = document.createElement('option');
-                    targetOption.value = code;
-                    targetOption.textContent = LANGUAGES[code];
-                    targetLangSelect.appendChild(targetOption);
-                }
-                sourceLangSelect.value = sourceLang;
-                targetLangSelect.value = targetLang;
-            }
-
-            function saveTextToFile(text, langCode) {
-                const filename = `translation_${langCode}_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.txt`;
-                const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                showFeedback('テキストを保存しました。');
-            }
-
-            function setupActionButtons(buttonId, textarea, action) {
-                const button = document.getElementById(buttonId);
-                if (button) {
-                    button.addEventListener('click', () => {
-                        const text = textarea.value;
-                        const langCode = (textarea === inputTextarea) ? sourceLang : targetLang;
-                        if (action === 'save' && text.trim()) {
-                            saveTextToFile(text, langCode);
-                        } else if (action === 'clear') {
-                            textarea.value = '';
-                            localStorage.setItem(textarea.id, '');
-                            if (textarea === inputTextarea) {
-                                translatedTextarea.value = '';
-                                localStorage.setItem('translatedText', '');
-                            }
-                            showFeedback('テキストエリアをクリアしました。');
-                        } else if (action === 'copy' && text.trim()) {
-                            navigator.clipboard.writeText(text)
-                                .then(() => showFeedback('テキストをクリップボードにコピーしました。'))
-                                .catch(err => showFeedback('コピーに失敗しました。', true));
-                        }
-                    });
-                }
-            }
-
-            async function translateText(text) {
-                if (!text.trim()) {
-                    translatedTextarea.value = '';
-                    localStorage.setItem('translatedText', '');
-                    return;
-                }
-                isTranslating = true;
-                loadingSpinner.style.display = 'inline-block';
-                try {
-                    const response = await fetch(`${freeGoogleTranslateUrl}?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await response.json();
-                    if (data && data[0] && data[0][0] && data[0][0][0]) {
-                        translatedTextarea.value = data[0][0][0];
-                        localStorage.setItem('translatedText', translatedTextarea.value);
-                    } else {
-                        translatedTextarea.value = '翻訳に失敗しました。';
-                        localStorage.setItem('translatedText', '翻訳に失敗しました。');
-                        showFeedback('翻訳に失敗しました。', true);
-                    }
-                } catch (error) {
-                    console.error('Translation error:', error);
-                    translatedTextarea.value = '翻訳エラーが発生しました。';
-                    localStorage.setItem('translatedText', '翻訳エラーが発生しました。');
-                    showFeedback('翻訳エラーが発生しました。', true);
-                } finally {
-                    loadingSpinner.style.display = 'none';
-                    isTranslating = false;
-                }
-            }
-
-            // --- Event Listeners ---
-            layoutButtons.forEach(button => {
-                button.addEventListener('click', (event) => {
-                    setLayout(event.target.dataset.layout);
-                });
             });
 
-            inputTextarea.addEventListener('input', (event) => {
-                const textToTranslate = event.target.value;
-                localStorage.setItem('inputText', textToTranslate);
+            /**
+             * テキストを翻訳する
+             * @param {string} text 翻訳するテキスト
+             */
+            function translateText(text) {
+                // 以前の翻訳リクエストがあればキャンセル
                 clearTimeout(debounceTimer);
-                if (textToTranslate.trim() && !isTranslating) {
-                    debounceTimer = setTimeout(() => { translateText(textToTranslate); }, DEBOUNCE_DELAY);
-                } else if (!textToTranslate.trim()) {
+
+                const trimmedText = text.trim();
+                if (!trimmedText) {
                     translatedTextarea.value = '';
-                    localStorage.setItem('translatedText', '');
+                    localStorage.removeItem('translatedText'); // 空の場合はローカルストレージもクリア
+                    loadingSpinner.style.display = 'none'; // スピナーも非表示に
+                    isTranslating = false; // 翻訳状態をリセット
+                    return;
                 }
+
+                // 翻訳中はスピナー表示
+                loadingSpinner.style.display = 'inline-block';
+                // isTranslating フラグは debounceTimer 内で設定されるため、ここでは設定しない
+
+                debounceTimer = setTimeout(async () => {
+                    if (isTranslating) { // まだ前の翻訳が実行中の場合は待機（非常に稀なケース）
+                         console.warn("Translation already in progress, skipping new request.");
+                         return;
+                    }
+                    isTranslating = true; // 翻訳開始
+
+                    let processedText = text; // 元のテキストを使用
+                    if (translationApplyOrder === 'before') {
+                        processedText = applyDictionary(text, translationDictionary);
+                        // console.log("Text to translate (before dictionary):", text);
+                        // console.log("Text to translate (after dictionary):", processedText);
+                    } else {
+                         // console.log("Text to translate (dictionary not applied before):", processedText);
+                    }
+
+
+                    // console.log(`Translating from ${sourceLang} to ${targetLang}: "${processedText.substring(0, 50)}..."`);
+
+                    try {
+                        // *** 修正点 3: テンプレートリテラルを使用 ***
+                        const url = `${FREE_GOOGLE_TRANSLATE_URL}?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(processedText)}`;
+                        const response = await fetch(url);
+
+                        if (!response.ok) {
+                            // レスポンスボディからエラーメッセージを取得しようと試みる（APIによる）
+                            let errorBody = '';
+                            try {
+                                errorBody = await response.text();
+                            } catch (e) { /* ignore */ }
+                            throw new Error(`HTTP error! status: ${response.status} ${response.statusText}. Body: ${errorBody}`);
+                        }
+
+                        const data = await response.json();
+                        // console.log("Translation API response:", data);
+
+                        let translation = '';
+                        if (data && data[0] && Array.isArray(data[0])) {
+                            translation = data[0].map(item => item[0]).join('');
+                        } else {
+                            console.warn("Unexpected translation API response format:", data);
+                            translation = "翻訳結果の取得に失敗しました (形式エラー)";
+                        }
+
+                        if (translationApplyOrder === 'after') {
+                            const originalTranslation = translation;
+                            translation = applyDictionary(translation, translationDictionary);
+                            // console.log("Translated text (before dictionary):", originalTranslation);
+                            // console.log("Translated text (after dictionary):", translation);
+                        } else {
+                             // console.log("Translated text (dictionary not applied after):", translation);
+                        }
+
+
+                        translatedTextarea.value = translation;
+                        localStorage.setItem('translatedText', translation);
+
+                    } catch (error) {
+                        console.error('Translation error:', error);
+                        showFeedback(`翻訳エラー: ${error.message}`, true);
+                        translatedTextarea.value = ''; // *** 修正点 4: エラー時に翻訳エリアをクリア ***
+                        localStorage.removeItem('translatedText'); // エラー時は保存しない
+                    } finally {
+                        isTranslating = false;
+                        loadingSpinner.style.display = 'none';
+                        // console.log("Translation finished.");
+                    }
+                }, DEBOUNCE_DELAY);
+            }
+
+            // --- イベントリスナー ---
+            inputTextarea.addEventListener('input', (event) => {
+                localStorage.setItem('inputText', event.target.value);
+                translateText(event.target.value);
             });
 
             sourceLangSelect.addEventListener('change', (event) => {
-                if (isRecognizing) {
-                    recognition.stop();
-                    speechStatus.textContent = '停止しました。';
-                    speechStatus.classList.add('active');
-                    setTimeout(() => speechStatus.classList.remove('active'), 1000);
-                }
-                const newSourceLang = event.target.value;
-                if (newSourceLang === targetLang) {
-                    const oldSourceLang = sourceLang;
-                    targetLang = oldSourceLang;
-                    targetLangSelect.value = targetLang;
-                    localStorage.setItem('targetLang', targetLang);
-                }
-                sourceLang = newSourceLang;
+                const newLang = event.target.value;
+                 if (isRecognizing) { // 認識中に言語を変更する場合
+                     stopRecognition(); // 一旦停止
+                 }
+                sourceLang = newLang;
                 localStorage.setItem('sourceLang', sourceLang);
-                updateUIForLanguage();
-                if (inputTextarea.value.trim()) {
-                    clearTimeout(debounceTimer);
-                    translateText(inputTextarea.value);
-                } else {
-                    translatedTextarea.value = '';
-                    localStorage.setItem('translatedText', '');
-                }
-                // 音声認識言語を更新 (認識中の場合、再開時に適用される)
+                document.getElementById('inputLanguageTitle').textContent = `入力エリア (${LANGUAGES[sourceLang]})`;
                 if (recognition) {
-                    recognition.lang = sourceLang;
+                    recognition.lang = sourceLang; // 認識言語を更新
                 }
+                translateText(inputTextarea.value); // 言語変更時に再翻訳
             });
 
             targetLangSelect.addEventListener('change', (event) => {
-                const newTargetLang = event.target.value;
-                if (newTargetLang === sourceLang) {
-                    const oldTargetLang = targetLang;
-                    sourceLang = oldTargetLang;
-                    sourceLangSelect.value = sourceLang;
-                    localStorage.setItem('sourceLang', sourceLang);
-                }
-                targetLang = newTargetLang;
+                targetLang = event.target.value;
                 localStorage.setItem('targetLang', targetLang);
-                updateUIForLanguage();
-                if (inputTextarea.value.trim()) {
-                    clearTimeout(debounceTimer);
-                    translateText(inputTextarea.value);
-                }
+                // スピナー要素を取得し直してからinnerHTMLを設定
+                const titleElement = document.getElementById('translatedLanguageTitle');
+                titleElement.textContent = `翻訳エリア (${LANGUAGES[targetLang]}) `; // テキスト部分を設定
+                titleElement.appendChild(loadingSpinner); // スピナーを再度追加
+                translateText(inputTextarea.value); // 言語変更時に再翻訳
             });
 
-            // Mic Button Listener
-            if (micButton && recognition) {
-                micButton.addEventListener('click', () => {
-                    if (!recognition) return;
 
-                    if (isRecognizing) {
-                        recognition.stop();
-                        speechStatus.textContent = '停止しました。';
-                        speechStatus.classList.add('active');
-                        setTimeout(() => speechStatus.classList.remove('active'), 1000);
-                    } else {
-                        // 認識開始前に入力言語を設定 (sourceLangSelectの変更時にも更新される)
-                        recognition.lang = sourceLang;
-                        try {
-                            recognition.start();
-                            speechStatus.textContent = '認識中...';
-                            speechStatus.classList.add('active');
-                        } catch (e) {
-                            console.error("Error starting speech recognition:", e);
-                            showFeedback("音声認識を開始できませんでした。マイクの準備ができているか確認してください。", true);
-                            speechStatus.textContent = 'エラー';
-                            speechStatus.classList.add('active');
-                            setTimeout(() => speechStatus.classList.remove('active'), 2000);
-                        }
-                    }
+            document.getElementById('saveInputButton').addEventListener('click', () => {
+                saveText('input', inputTextarea.value);
+            });
+
+            document.getElementById('clearInputButton').addEventListener('click', () => {
+                inputTextarea.value = '';
+                localStorage.removeItem('inputText');
+                translateText(''); // 翻訳エリアもクリア
+            });
+
+            document.getElementById('copyInputButton').addEventListener('click', () => {
+                copyToClipboard(inputTextarea.value, '入力テキスト');
+            });
+
+            document.getElementById('saveTranslatedButton').addEventListener('click', () => {
+                saveText('translated', translatedTextarea.value);
+            });
+
+            document.getElementById('clearTranslatedButton').addEventListener('click', () => {
+                translatedTextarea.value = '';
+                localStorage.removeItem('translatedText');
+                 if (synth.speaking) { // 読み上げ中なら停止
+                    synth.cancel();
+                 }
+            });
+
+            document.getElementById('copyTranslatedButton').addEventListener('click', () => {
+                copyToClipboard(translatedTextarea.value, '翻訳テキスト');
+            });
+
+            layoutButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const layout = event.target.dataset.layout;
+                    setLayout(layout);
+                    localStorage.setItem('layout', layout);
+                    // Update button styles
+                    layoutButtons.forEach(btn => {
+                        btn.classList.remove('active', 'bg-blue-500', 'hover:bg-blue-700', 'text-white');
+                        btn.classList.add('bg-gray-300', 'hover:bg-gray-400', 'text-gray-800');
+                    });
+                    event.target.classList.add('active', 'bg-blue-500', 'hover:bg-blue-700', 'text-white');
+                    event.target.classList.remove('bg-gray-300', 'hover:bg-gray-400', 'text-gray-800');
                 });
+            });
+
+            /**
+             * 言語選択オプションを生成してDOMに追加する
+             */
+            function populateLanguageOptions() {
+                // sourceLangSelect, targetLangSelect をクリア
+                sourceLangSelect.innerHTML = '';
+                targetLangSelect.innerHTML = '';
+
+                for (const code in LANGUAGES) {
+                    const optionSource = document.createElement('option');
+                    optionSource.value = code;
+                    optionSource.textContent = LANGUAGES[code];
+                    sourceLangSelect.appendChild(optionSource);
+
+                    const optionTarget = document.createElement('option');
+                    optionTarget.value = code;
+                    optionTarget.textContent = LANGUAGES[code];
+                    targetLangSelect.appendChild(optionTarget);
+                }
+                // 値を設定する前にオプションが存在することを確認
+                 if (sourceLangSelect.querySelector(`option[value="${sourceLang}"]`)) {
+                    sourceLangSelect.value = sourceLang;
+                 } else {
+                     sourceLang = sourceLangSelect.options[0].value; // 存在しない場合は最初のオプションにフォールバック
+                     localStorage.setItem('sourceLang', sourceLang);
+                 }
+                 if (targetLangSelect.querySelector(`option[value="${targetLang}"]`)) {
+                    targetLangSelect.value = targetLang;
+                 } else {
+                     targetLang = targetLangSelect.options[1] ? targetLangSelect.options[1].value : targetLangSelect.options[0].value; // 存在しない場合は2番目（または最初）にフォールバック
+                     localStorage.setItem('targetLang', targetLang);
+                 }
+
+                document.getElementById('inputLanguageTitle').textContent = `入力エリア (${LANGUAGES[sourceLang]})`;
+                // スピナー要素を取得し直してからinnerHTMLを設定
+                const titleElement = document.getElementById('translatedLanguageTitle');
+                titleElement.textContent = `翻訳エリア (${LANGUAGES[targetLang]}) `; // テキスト部分を設定
+                titleElement.appendChild(loadingSpinner); // スピナーを再度追加
             }
 
-            // Setup action buttons
-            setupActionButtons('saveInputButton', inputTextarea, 'save');
-            setupActionButtons('clearInputButton', inputTextarea, 'clear');
-            setupActionButtons('copyInputButton', inputTextarea, 'copy');
-            setupActionButtons('saveTranslatedButton', translatedTextarea, 'save');
-            setupActionButtons('clearTranslatedButton', translatedTextarea, 'clear');
-            setupActionButtons('copyTranslatedButton', translatedTextarea, 'copy');
 
-            // --- Initialization ---
+            /**
+             * テキストエリアのレイアウトを設定する
+             * @param {string} layout 'horizontal' または 'vertical'
+             */
+            function setLayout(layout) {
+                const textAreas = document.getElementById('textAreas');
+                if (layout === 'vertical') {
+                    textAreas.classList.remove('grid-cols-2', 'gap-8');
+                    textAreas.classList.add('grid-cols-1', 'gap-4');
+                     inputTextarea.rows = 6; // 縦表示のときは少し小さく
+                     translatedTextarea.rows = 6;
+                } else { // horizontal (default)
+                    textAreas.classList.remove('grid-cols-1', 'gap-4');
+                    textAreas.classList.add('grid-cols-2', 'gap-8');
+                     inputTextarea.rows = 8; // 元のサイズに戻す
+                     translatedTextarea.rows = 8;
+                }
+                currentLayout = layout;
+            }
+
+            /**
+             * テキストをファイルに保存する
+             * @param {string} type 'input' または 'translated'
+             * @param {string} text 保存するテキスト
+             */
+            function saveText(type, text) {
+                 if (!text.trim()) {
+                     showFeedback("保存するテキストがありません。", true);
+                     return;
+                 }
+                 const langCode = type === 'input' ? sourceLang : targetLang;
+                 const defaultFilename = `${type}_${langCode}_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.txt`;
+                 // BOMを追加してUTF-8であることを示す
+                 const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                 const blob = new Blob([bom, text], { type: 'text/plain;charset=utf-8' });
+                 const url = URL.createObjectURL(blob);
+                 const a = document.createElement('a');
+                 a.href = url;
+                 a.download = defaultFilename;
+                 document.body.appendChild(a);
+                 a.click();
+                 document.body.removeChild(a);
+                 URL.revokeObjectURL(url);
+                 showFeedback(`${type === 'input' ? '入力' : '翻訳'}テキストを ${defaultFilename} として保存しました。`);
+            }
+
+
+            /**
+             * テキストをクリップボードにコピーする
+             * @param {string} text コピーするテキスト
+             * @param {string} type テキストの種類 (例: '入力テキスト', '翻訳テキスト')
+             */
+            async function copyToClipboard(text, type) {
+                 if (!text) {
+                     showFeedback(`${type}が空です。`, true);
+                     return;
+                 }
+                 try {
+                     await navigator.clipboard.writeText(text);
+                     showFeedback(`${type}をクリップボードにコピーしました。`);
+                 } catch (err) {
+                     console.error('Failed to copy text: ', err);
+                     showFeedback(`${type}のコピーに失敗しました。コンソールを確認してください。`, true);
+                     // フォールバック (非推奨)
+                     // try {
+                     //    const textArea = document.createElement("textarea");
+                     //    textArea.value = text;
+                     //    document.body.appendChild(textArea);
+                     //    textArea.focus();
+                     //    textArea.select();
+                     //    document.execCommand('copy');
+                     //    document.body.removeChild(textArea);
+                     //    showFeedback(`${type}をコピーしました (フォールバック)。`);
+                     // } catch (fallbackErr) {
+                     //    console.error('Fallback copy failed: ', fallbackErr);
+                     //    showFeedback(`${type}のコピーに失敗しました。`, true);
+                     // }
+                 }
+             }
+
+
+            /**
+             * フィードバックメッセージを表示する
+             * @param {string} message 表示するメッセージ
+             * @param {boolean} isError エラーメッセージかどうか
+             */
+            function showFeedback(message, isError = false) {
+                feedbackArea.textContent = message;
+                feedbackArea.className = 'show'; // クラス名をリセットしてから追加
+                if (isError) {
+                    feedbackArea.style.backgroundColor = 'rgba(192, 57, 43, 0.9)'; // Darker red for error
+                } else {
+                    feedbackArea.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                }
+                clearTimeout(feedbackTimer);
+                feedbackTimer = setTimeout(() => {
+                    feedbackArea.classList.remove('show');
+                     // トランジション終了後にスタイルをリセット（任意）
+                     // setTimeout(() => {
+                     //     if (!feedbackArea.classList.contains('show')) {
+                     //         feedbackArea.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                     //     }
+                     // }, 300); // transition duration
+                }, FEEDBACK_DURATION);
+            }
+
+            // --- 初期化 ---
             function initialize() {
-                const savedLayout = localStorage.getItem('translationEditorLayout') || 'horizontal';
-                setLayout(savedLayout);
-                sourceLang = localStorage.getItem('sourceLang') || 'ja';
-                targetLang = localStorage.getItem('targetLang') || 'en';
-                if (!LANGUAGES[sourceLang]) sourceLang = 'ja';
-                if (!LANGUAGES[targetLang] || targetLang === sourceLang) {
-                    targetLang = (sourceLang === 'en') ? 'ja' : 'en';
-                    localStorage.setItem('targetLang', targetLang);
-                }
-                populateDropdowns();
-                inputTextarea.value = localStorage.getItem('inputText') || '';
-                translatedTextarea.value = localStorage.getItem('translatedText') || '';
-                updateUIForLanguage();
+                // 言語オプション生成
+                populateLanguageOptions();
 
-                if (!SpeechRecognition) {
-                    showFeedback("お使いのブラウザは音声認識に対応していません。", true);
+                // ローカルストレージから設定読み込み
+                const storedInputText = localStorage.getItem('inputText');
+                const storedLayout = localStorage.getItem('layout');
+                const storedTranslationApplyOrder = localStorage.getItem(LOCAL_STORAGE_KEY_TRANSLATION_APPLY_ORDER);
+                const storedReadingApplyOrder = localStorage.getItem(LOCAL_STORAGE_KEY_READING_APPLY_ORDER);
+
+                // 翻訳適用順序
+                if (storedTranslationApplyOrder && translationApplyOrderSelect.querySelector(`option[value="${storedTranslationApplyOrder}"]`)) {
+                    translationApplyOrder = storedTranslationApplyOrder;
+                    translationApplyOrderSelect.value = storedTranslationApplyOrder;
+                } else {
+                    translationApplyOrderSelect.value = translationApplyOrder; // デフォルト値設定
+                    localStorage.setItem(LOCAL_STORAGE_KEY_TRANSLATION_APPLY_ORDER, translationApplyOrder);
                 }
+
+                // 読み上げ適用順序
+                if (storedReadingApplyOrder && readingApplyOrderSelect.querySelector(`option[value="${storedReadingApplyOrder}"]`)) {
+                    readingApplyOrder = storedReadingApplyOrder;
+                    readingApplyOrderSelect.value = storedReadingApplyOrder;
+                } else {
+                    readingApplyOrderSelect.value = readingApplyOrder; // デフォルト値設定
+                     localStorage.setItem(LOCAL_STORAGE_KEY_READING_APPLY_ORDER, readingApplyOrder);
+                }
+
+                // レイアウト
+                const layoutToSet = storedLayout === 'vertical' ? 'vertical' : 'horizontal'; // デフォルトは horizontal
+                setLayout(layoutToSet);
+                layoutButtons.forEach(btn => {
+                    const isActive = btn.dataset.layout === layoutToSet;
+                    btn.classList.toggle('active', isActive);
+                    btn.classList.toggle('bg-blue-500', isActive);
+                    btn.classList.toggle('hover:bg-blue-700', isActive);
+                    btn.classList.toggle('text-white', isActive);
+                    btn.classList.toggle('bg-gray-300', !isActive);
+                    btn.classList.toggle('hover:bg-gray-400', !isActive);
+                    btn.classList.toggle('text-gray-800', !isActive);
+                });
+
+                // 辞書UI初期化
+                updateDictionaryUI();
+
+                 // 入力テキストと初回翻訳
+                 if (storedInputText) {
+                     inputTextarea.value = storedInputText;
+                     // 翻訳は非同期なので少し遅延させるか、即時実行
+                     translateText(storedInputText); // 保存されたテキストで翻訳開始
+                 } else {
+                      // ローカルストレージにテキストがない場合、翻訳エリアをクリア
+                      translatedTextarea.value = '';
+                      localStorage.removeItem('translatedText');
+                 }
+
+
+                // 音声リスト取得 (初期化時に再度試みる)
+                populateVoices();
             }
 
+            // --- 実行 ---
             initialize();
 
         })();
